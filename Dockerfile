@@ -1,5 +1,3 @@
-FROM vikunja/vikunja:latest
+FROM leantime/leantime:latest
 
-ENV VIKUNJA_FILES_BASEPATH=/tmp/vikunja/files
-
-EXPOSE 3456
+EXPOSE 8080

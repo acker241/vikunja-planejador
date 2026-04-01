@@ -118,8 +118,7 @@ class VikunjaClient:
 
     def create_task(self, project_id: int, title: str, description: str = "",
                     done: bool = False, priority: int = 0,
-                    due_date: str = None, labels: list = None,
-                    bucket_id: int = None) -> dict:
+                    due_date: str = None, bucket_id: int = None) -> dict:
         payload = {
             "title": title[:250],
             "description": description,
@@ -128,8 +127,6 @@ class VikunjaClient:
         }
         if due_date:
             payload["due_date"] = due_date
-        if labels:
-            payload["labels"] = labels
         if bucket_id:
             payload["bucket_id"] = bucket_id
 
@@ -139,6 +136,14 @@ class VikunjaClient:
         )
         resp.raise_for_status()
         return resp.json()
+
+    def assign_label(self, task_id: int, label_id: int):
+        resp = self.session.put(
+            f"{self.base_url}/api/v1/tasks/{task_id}/labels",
+            json={"label_id": label_id},
+        )
+        if resp.status_code not in (200, 201):
+            pass  # silently skip duplicates
 
     def create_label(self, title: str, hex_color: str = "#cecece") -> dict:
         resp = self.session.put(f"{self.base_url}/api/v1/labels", json={
@@ -210,18 +215,30 @@ def parse_tarefas_por_pessoa(wb) -> list:
                 detalhes = "\n".join(titulo_lines[1:]) if len(titulo_lines) > 1 else ""
 
                 descricao_parts = []
+                # Header com metadados
+                meta = []
                 if responsavel:
-                    descricao_parts.append(f"**Responsavel:** {responsavel}")
+                    meta.append(f"**Responsavel:** {responsavel}")
                 if prazo:
-                    descricao_parts.append(f"**Prazo:** {prazo}")
+                    meta.append(f"**Prazo:** {prazo}")
+                if status:
+                    meta.append(f"**Status:** {status}")
+                if prioridade:
+                    meta.append(f"**Prioridade:** {prioridade}")
+                if meta:
+                    descricao_parts.append(" | ".join(meta))
+
                 if detalhes:
-                    descricao_parts.append(f"\n**Detalhes:**\n{detalhes}")
+                    descricao_parts.append(f"\n---\n\n### O que fazer\n\n{detalhes}")
+
                 if entregavel:
-                    descricao_parts.append(f"\n**Entregavel:**\n{entregavel}")
+                    descricao_parts.append(f"\n### Entregaveis\n\n{entregavel}")
+
                 if depende_de and depende_de != "—":
-                    descricao_parts.append(f"\n**Depende de:** {depende_de}")
+                    descricao_parts.append(f"\n### Dependencias\n\n{depende_de}")
+
                 if obs:
-                    descricao_parts.append(f"\n**Obs:** {obs}")
+                    descricao_parts.append(f"\n### Observacoes\n\n{obs}")
 
                 done = STATUS_MAP.get(status, False)
                 prio = PRIORITY_MAP.get(prioridade, 0)
@@ -274,14 +291,17 @@ def parse_cronograma(wb) -> list:
                         semanas.append(f"Sem {i}")
 
                 descricao_parts = []
+                meta = []
                 if responsavel:
-                    descricao_parts.append(f"**Responsavel:** {responsavel}")
+                    meta.append(f"**Responsavel:** {responsavel}")
                 if prerequisito and prerequisito != "—":
-                    descricao_parts.append(f"**Pre-requisito:** {prerequisito}")
+                    meta.append(f"**Pre-requisito:** {prerequisito}")
                 if semanas:
-                    descricao_parts.append(f"**Periodo:** {', '.join(semanas)}")
+                    meta.append(f"**Periodo:** {', '.join(semanas)}")
+                if meta:
+                    descricao_parts.append(" | ".join(meta))
                 if obs:
-                    descricao_parts.append(f"**Obs:** {obs}")
+                    descricao_parts.append(f"\n### Observacoes\n\n{obs}")
 
                 tasks.append({
                     "title": f"{num}. {atividade}",
@@ -314,14 +334,19 @@ def parse_checklist_cartorio(wb) -> list:
                 done = status.lower() in ("concluído", "concluido")
 
                 descricao_parts = []
+                meta = []
                 if categoria:
-                    descricao_parts.append(f"**Categoria:** {categoria}")
-                if descricao:
-                    descricao_parts.append(f"\n{descricao}")
+                    meta.append(f"**Categoria:** {categoria}")
+                if status:
+                    meta.append(f"**Status:** {status}")
                 if responsavel and responsavel != "—":
-                    descricao_parts.append(f"\n**Responsavel:** {responsavel}")
+                    meta.append(f"**Responsavel:** {responsavel}")
+                if meta:
+                    descricao_parts.append(" | ".join(meta))
+                if descricao:
+                    descricao_parts.append(f"\n### Descricao\n\n{descricao}")
                 if obs:
-                    descricao_parts.append(f"\n**Obs:** {obs}")
+                    descricao_parts.append(f"\n### Observacoes\n\n{obs}")
 
                 labels = []
                 if responsavel and responsavel != "—":
@@ -369,14 +394,17 @@ def parse_pendencias(wb) -> list:
             done = "CONCLU" in criticidade.upper() or "CONCLU" in obs.upper()[:20]
 
             descricao_parts = []
+            meta = []
             if fonte:
-                descricao_parts.append(f"**Fonte:** {fonte}")
+                meta.append(f"**Fonte:** {fonte}")
             if criticidade:
-                descricao_parts.append(f"**Criticidade:** {criticidade}")
+                meta.append(f"**Criticidade:** {criticidade}")
             if responsavel:
-                descricao_parts.append(f"**Responsavel:** {responsavel}")
+                meta.append(f"**Responsavel:** {responsavel}")
+            if meta:
+                descricao_parts.append(" | ".join(meta))
             if obs:
-                descricao_parts.append(f"\n**Obs:** {obs}")
+                descricao_parts.append(f"\n### Observacoes\n\n{obs}")
 
             prio = 4 if "ALTA" in criticidade.upper() else 3
             labels = ["BLOQUEANTE"] if "BLOQ" in criticidade.upper() or "BLOQ" in obs.upper() else []
@@ -422,12 +450,10 @@ def parse_riscos(wb) -> list:
             responsavel = safe_str(row_list[6])
 
             descricao_parts = [
-                f"**Probabilidade:** {probabilidade}",
-                f"**Impacto:** {impacto}",
-                f"\n**Controle/Mitigacao:**\n{controle}",
+                f"**Probabilidade:** {probabilidade} | **Impacto:** {impacto} | **Responsavel:** {responsavel}",
             ]
-            if responsavel:
-                descricao_parts.append(f"\n**Responsavel:** {responsavel}")
+            if controle:
+                descricao_parts.append(f"\n### Controle / Mitigacao\n\n{controle}")
 
             prio = 4 if impacto in ("Alto", "Critico") else 3
             labels = [f"Impacto {impacto}"]
@@ -474,14 +500,17 @@ def parse_cnpj_redesim(wb) -> list:
                 obs = safe_str(row_list[6])
 
                 descricao_parts = []
+                meta = []
                 if current_phase:
-                    descricao_parts.append(f"**Fase:** {current_phase}")
+                    meta.append(f"**Fase:** {current_phase}")
                 if quem:
-                    descricao_parts.append(f"**Quem:** {quem}")
+                    meta.append(f"**Quem:** {quem}")
                 if onde:
-                    descricao_parts.append(f"**Onde:** {onde}")
+                    meta.append(f"**Onde:** {onde}")
+                if meta:
+                    descricao_parts.append(" | ".join(meta))
                 if obs:
-                    descricao_parts.append(f"**Obs:** {obs}")
+                    descricao_parts.append(f"\n### Observacoes\n\n{obs}")
 
                 labels = []
                 if quem:
@@ -525,19 +554,18 @@ def import_tasks(client: VikunjaClient, project_id: int, tasks: list,
     count_todo = 0
 
     for t in tasks:
-        labels_payload = []
-        for lname in t.get("labels", []):
-            if lname in label_map:
-                labels_payload.append({"id": label_map[lname]["id"]})
-
         task = client.create_task(
             project_id=project_id,
             title=t["title"],
             description=t.get("description", ""),
             done=t.get("done", False),
             priority=t.get("priority", 0),
-            labels=labels_payload if labels_payload else None,
         )
+
+        # Assign labels after creating task
+        for lname in t.get("labels", []):
+            if lname in label_map:
+                client.assign_label(task["id"], label_map[lname]["id"])
         if t.get("done"):
             count_done += 1
         else:

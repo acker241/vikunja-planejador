@@ -1,94 +1,74 @@
-# Planejador - Vikunja para Associacao de Adquirentes
+# Planejador - Leantime para Associacao de Adquirentes
 
 Gestor de projetos self-hosted para acompanhar a constituicao da Associacao
 de Adquirentes do Empreendimento Mondrian BFabbriani (Itapema/SC).
 
 ## Stack
 
-- **Vikunja** (vikunja/vikunja:latest) — gestor de projetos open-source
-- **PostgreSQL 16** — banco de dados
+- **Leantime** (leantime/leantime:latest) — gestor de projetos open-source (Kanban + Gantt + Timeline)
+- **MySQL** — banco de dados (Leantime nao suporta PostgreSQL)
 - **Railway** — hosting
 
 ## Deploy no Railway
 
-### Passo 1 — Criar o banco de dados
+### Passo 1 — Criar o banco de dados MySQL
 
 1. Abrir [railway.app](https://railway.app) e criar novo projeto
-2. Clicar **+ New** → **Database** → **PostgreSQL**
-3. Anotar as variaveis de conexao (host, user, password, database)
+2. Clicar **+ New** → **Database** → **MySQL**
+3. Anotar as variaveis de conexao
 
-### Passo 2 — Criar o servico Vikunja
+### Passo 2 — Criar o servico Leantime
 
-1. No mesmo projeto, clicar **+ New** → **Docker Image**
-2. Digitar: `vikunja/vikunja:latest`
-3. Em **Settings** → **Networking**, gerar dominio publico (porta **3456**)
+1. No mesmo projeto, clicar **+ New** → **GitHub Repo** → `acker241/vikunja-planejador`
+2. Railway detecta o Dockerfile e faz build
+3. Em **Settings** → **Networking**, gerar dominio publico (porta **8080**)
 4. Em **Variables**, adicionar:
 
 ```
-VIKUNJA_DATABASE_TYPE=postgres
-VIKUNJA_DATABASE_HOST=${{Postgres.PGHOST}}
-VIKUNJA_DATABASE_DATABASE=${{Postgres.PGDATABASE}}
-VIKUNJA_DATABASE_USER=${{Postgres.PGUSER}}
-VIKUNJA_DATABASE_PASSWORD=${{Postgres.PGPASSWORD}}
-VIKUNJA_DATABASE_SSLMODE=require
-VIKUNJA_SERVICE_PUBLICURL=https://SEU-DOMINIO.up.railway.app
-VIKUNJA_SERVICE_TIMEZONE=America/Sao_Paulo
-VIKUNJA_SERVICE_ENABLEREGISTRATION=true
-VIKUNJA_SERVICE_ENABLELINKSHARING=true
-PORT=3456
+LEAN_DB_HOST=${{MySQL.MYSQLHOST}}
+LEAN_DB_USER=${{MySQL.MYSQLUSER}}
+LEAN_DB_PASSWORD=${{MySQL.MYSQLPASSWORD}}
+LEAN_DB_DATABASE=${{MySQL.MYSQLDATABASE}}
+LEAN_DB_PORT=${{MySQL.MYSQLPORT}}
+LEAN_SESSION_PASSWORD=uma_senha_longa_aleatoria_aqui
+LEAN_APP_URL=https://SEU-DOMINIO.up.railway.app
+LEAN_SITENAME=Associacao Mondrian
+PORT=8080
 ```
 
-5. Deploy automatico. Aguardar ~1-2 min.
+5. Deploy automatico. Aguardar ~2-3 min.
 
-### Passo 3 — Criar conta admin
+### Passo 3 — Setup inicial
 
-1. Aceder ao dominio publico gerado pelo Railway
-2. Registar primeiro utilizador (sera o admin)
-3. Desativar registro aberto se quiser (mudar variavel para false)
+1. Aceder ao dominio — Leantime mostra pagina de instalacao
+2. Criar conta admin
+3. Ir a **Company Settings > API** e criar uma API key
 
 ### Passo 4 — Importar tarefas do Excel
 
 ```bash
 pip install openpyxl requests
 
-py scripts/import_vikunja.py \
+py scripts/import_leantime.py \
   --url https://SEU-DOMINIO.up.railway.app \
-  --user SEU_USER \
-  --password SUA_SENHA
+  --api-key SUA_API_KEY
 ```
 
-Isto cria automaticamente:
-- 1 projeto principal + 6 sub-projetos
-- 143 tarefas com prioridade, status e labels
-- Labels por responsavel (Caina, Jair, Advogado, etc.)
-
-### Teste local (opcional)
-
-```bash
-docker-compose up -d
-# Aceder em http://localhost:3456
-```
-
-## Estrutura do projeto no Vikunja
+## Estrutura dos projetos no Leantime
 
 ```
-Associacao Adquirentes — Mondrian BFabbriani
-  ├── Tarefas Operacionais       (24 tarefas — C-01..C-09, J-01..J-05, A-01..A-05, etc.)
-  ├── Cronograma Geral           (15 atividades sequenciais em 4 semanas)
-  ├── Checklist Cartorio         (51 itens de conformidade documental)
-  ├── Processo CNPJ-REDESIM      (33 passos para abertura do CNPJ)
-  ├── Pendencias e Bloqueios     (10 itens bloqueantes)
-  └── Riscos e Controles         (10 riscos com mitigacao)
+Tarefas Operacionais       (24 tarefas — C-01..C-09, J-01..J-05, etc.)
+Cronograma Geral           (15 milestones sequenciais em 4 semanas)
+Checklist Cartorio         (51 itens de conformidade documental)
+Processo CNPJ-REDESIM      (33 passos para abertura do CNPJ)
+Pendencias e Bloqueios     (10 itens bloqueantes)
+Riscos e Controles         (10 riscos com mitigacao)
 ```
-
-## Controlo de acesso
-
-- **Jair / Caina**: contas com acesso de escrita
-- **Adquirentes**: acesso read-only via link partilhado
-- **Advogado/Contador**: contas com acesso limitado a projetos relevantes
 
 ## Ficheiros
 
+- `Dockerfile` — build para Railway (Leantime)
 - `docker-compose.yml` — deploy local com Docker
-- `scripts/import_vikunja.py` — importador de tarefas do Excel
-- `Manual_Operacional_Associacao_v1.xlsx` — planilha fonte
+- `scripts/import_leantime.py` — importador de tarefas para Leantime
+- `scripts/import_vikunja.py` — importador de tarefas para Vikunja (alternativa)
+- `Manual_Operacional_Associacao_v1.xlsx` — planilha fonte (nao versionada — dados pessoais)

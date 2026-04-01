@@ -1,62 +1,47 @@
 version: "3.8"
 
-# Vikunja - Gestor de Projetos
+# Leantime - Gestor de Projetos
 # Deploy local: docker-compose up -d
-# Deploy Railway: usar cada servico como service separado
+# Aceder em http://localhost:8080
 
 services:
-  vikunja:
-    image: vikunja/vikunja:latest
-    container_name: vikunja
+  leantime:
+    image: leantime/leantime:latest
+    container_name: leantime
     restart: unless-stopped
     ports:
-      - "3456:3456"
+      - "8080:8080"
     environment:
-      # --- Database ---
-      VIKUNJA_DATABASE_TYPE: postgres
-      VIKUNJA_DATABASE_HOST: db
-      VIKUNJA_DATABASE_DATABASE: vikunja
-      VIKUNJA_DATABASE_USER: vikunja
-      VIKUNJA_DATABASE_PASSWORD: ${DB_PASSWORD:-vikunja_secret_2026}
-
-      # --- Service ---
-      VIKUNJA_SERVICE_PUBLICURL: ${PUBLIC_URL:-http://localhost:3456}
-      VIKUNJA_SERVICE_TIMEZONE: America/Sao_Paulo
-      VIKUNJA_SERVICE_ENABLEREGISTRATION: "true"
-      VIKUNJA_SERVICE_ENABLELINKSHARING: "true"
-      VIKUNJA_SERVICE_ENABLEPUBLICTEAMS: "false"
-
-      # --- Mailer (opcional - configurar para notificacoes) ---
-      # VIKUNJA_MAILER_ENABLED: "true"
-      # VIKUNJA_MAILER_HOST: smtp.gmail.com
-      # VIKUNJA_MAILER_PORT: 587
-      # VIKUNJA_MAILER_USERNAME: associacao@dominio.com.br
-      # VIKUNJA_MAILER_PASSWORD: app_password_aqui
-
-      # --- Auth ---
-      VIKUNJA_SERVICE_MAXITEMSPERPAGE: 100
-    volumes:
-      - vikunja_files:/app/vikunja/files
+      LEAN_DB_HOST: db
+      LEAN_DB_USER: leantime
+      LEAN_DB_PASSWORD: ${DB_PASSWORD:-leantime_secret_2026}
+      LEAN_DB_DATABASE: leantime
+      LEAN_DB_PORT: 3306
+      LEAN_SESSION_PASSWORD: ${SESSION_PASSWORD:-sessao_secreta_aleatoria_2026}
+      LEAN_APP_URL: ${PUBLIC_URL:-http://localhost:8080}
+      LEAN_SITENAME: "Associacao Mondrian"
+      # LEAN_MAILER_HOST: smtp.gmail.com
+      # LEAN_MAILER_PORT: 587
     depends_on:
       db:
         condition: service_healthy
 
   db:
-    image: postgres:16-alpine
-    container_name: vikunja_db
+    image: mysql:8.0
+    container_name: leantime_db
     restart: unless-stopped
     environment:
-      POSTGRES_USER: vikunja
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-vikunja_secret_2026}
-      POSTGRES_DB: vikunja
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_secret_2026}
+      MYSQL_USER: leantime
+      MYSQL_PASSWORD: ${DB_PASSWORD:-leantime_secret_2026}
+      MYSQL_DATABASE: leantime
     volumes:
-      - vikunja_db:/var/lib/postgresql/data
+      - leantime_db:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vikunja"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       timeout: 3s
       retries: 5
 
 volumes:
-  vikunja_files:
-  vikunja_db:
+  leantime_db:
