@@ -1,0 +1,62 @@
+version: "3.8"
+
+# Vikunja - Gestor de Projetos
+# Deploy local: docker-compose up -d
+# Deploy Railway: usar cada servico como service separado
+
+services:
+  vikunja:
+    image: vikunja/vikunja:latest
+    container_name: vikunja
+    restart: unless-stopped
+    ports:
+      - "3456:3456"
+    environment:
+      # --- Database ---
+      VIKUNJA_DATABASE_TYPE: postgres
+      VIKUNJA_DATABASE_HOST: db
+      VIKUNJA_DATABASE_DATABASE: vikunja
+      VIKUNJA_DATABASE_USER: vikunja
+      VIKUNJA_DATABASE_PASSWORD: ${DB_PASSWORD:-vikunja_secret_2026}
+
+      # --- Service ---
+      VIKUNJA_SERVICE_PUBLICURL: ${PUBLIC_URL:-http://localhost:3456}
+      VIKUNJA_SERVICE_TIMEZONE: America/Sao_Paulo
+      VIKUNJA_SERVICE_ENABLEREGISTRATION: "true"
+      VIKUNJA_SERVICE_ENABLELINKSHARING: "true"
+      VIKUNJA_SERVICE_ENABLEPUBLICTEAMS: "false"
+
+      # --- Mailer (opcional - configurar para notificacoes) ---
+      # VIKUNJA_MAILER_ENABLED: "true"
+      # VIKUNJA_MAILER_HOST: smtp.gmail.com
+      # VIKUNJA_MAILER_PORT: 587
+      # VIKUNJA_MAILER_USERNAME: associacao@dominio.com.br
+      # VIKUNJA_MAILER_PASSWORD: app_password_aqui
+
+      # --- Auth ---
+      VIKUNJA_SERVICE_MAXITEMSPERPAGE: 100
+    volumes:
+      - vikunja_files:/app/vikunja/files
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    container_name: vikunja_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vikunja
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-vikunja_secret_2026}
+      POSTGRES_DB: vikunja
+    volumes:
+      - vikunja_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vikunja"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  vikunja_files:
+  vikunja_db:
